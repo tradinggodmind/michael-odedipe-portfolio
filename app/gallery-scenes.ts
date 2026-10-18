@@ -76,10 +76,10 @@ function drawReel(ctx:CanvasRenderingContext2D,img:HTMLImageElement,left:number,
   ctx.drawImage(img,sx+sw*u,sy,sw*dx/(right-left)+.15,sh,x-.12,H/2-h/2-3,dx+.25,h+6);
  }ctx.restore();
 }
-function flarePath(ctx:CanvasRenderingContext2D,neck:number,outer:number,strength:number){ctx.beginPath();for(let j=0;j<=32;j++){const s=j/32,x=mix(neck,outer,s),h=flareHeight(s,strength);j?ctx.lineTo(x,CY-h/2):ctx.moveTo(x,CY-h/2);}for(let j=32;j>=0;j--){const s=j/32,x=mix(neck,outer,s),h=flareHeight(s,strength);ctx.lineTo(x,CY+h/2);}ctx.closePath();}
-function drawFlare(ctx:CanvasRenderingContext2D,img:HTMLImageElement,neck:number,outer:number,strength:number){if(Math.abs(outer-neck)<.8)return;const left=outer<neck,{sx,sy,sw,sh}=crop(img,1.1),n=72;
+function flarePath(ctx:CanvasRenderingContext2D,neck:number,outer:number,strength:number){ctx.beginPath();for(let j=0;j<=96;j++){const s=j/96,x=mix(neck,outer,s),h=flareHeight(s,strength);j?ctx.lineTo(x,CY-h/2):ctx.moveTo(x,CY-h/2);}for(let j=96;j>=0;j--){const s=j/96,x=mix(neck,outer,s),h=flareHeight(s,strength);ctx.lineTo(x,CY+h/2);}ctx.closePath();}
+function drawFlare(ctx:CanvasRenderingContext2D,img:HTMLImageElement,neck:number,outer:number,strength:number){if(Math.abs(outer-neck)<.8)return;const left=outer<neck,{sx,sy,sw,sh}=crop(img,1.1),n=128;
  const tex=(s:number)=>.5+(left?-1:1)*.28*(1-Math.exp(-8*s));
- const surface=()=>{ctx.save();flarePath(ctx,neck,outer,strength);ctx.clip();for(let j=0;j<n;j++){const s=j/n,t=(j+1)/n,x=mix(neck,outer,s),nx=mix(neck,outer,t),mid=(s+t)/2,h=flareHeight(mid,strength),u=tex(s),v=tex(t),sourceX=sx+sw*Math.min(u,v),sourceW=Math.max(.5,sw*Math.abs(v-u));ctx.drawImage(img,sourceX,sy,sourceW,sh,Math.min(x,nx)-.25,CY-h/2,Math.abs(nx-x)+.7,h);}ctx.restore();};
+ const surface=()=>{ctx.save();flarePath(ctx,neck,outer,strength);ctx.clip();for(let j=0;j<n;j++){const s=j/n,t=(j+1)/n,x=mix(neck,outer,s),nx=mix(neck,outer,t),mid=(s+t)/2,h=flareHeight(mid,strength),u=tex(s),v=tex(t),sourceX=sx+sw*Math.min(u,v),sourceW=Math.max(.5,sw*Math.abs(v-u));ctx.drawImage(img,sourceX,sy,sourceW,sh,Math.min(x,nx)-.25,CY-h/2-4,Math.abs(nx-x)+.7,h+8);}ctx.restore();};
  // Subtle displaced sheets carry the photographic colour behind the warped
  // boundary. The centre poster and the stage itself are never processed.
  for(const [dx,alpha,blur] of [[left?-10:10,.08,6],[left?-4:4,.12,2]] as const){ctx.save();ctx.translate(dx,0);ctx.globalAlpha=alpha;ctx.filter=`blur(${blur}px)`;surface();ctx.restore();}
