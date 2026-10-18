@@ -7,31 +7,32 @@ const TRANSITION_MS=1750,HOLD_MS=1000,STAGE_W=640,STAGE_H=419;
 const easer=(t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 
 export default function SpatialGallery<T extends GalleryWork>({chapter,works,onOpen,reduced}:{chapter:{id:string;n:string;name:string;label:string;subtitle:string;mode:string};works:T[];onOpen:(w:T)=>void;reduced:boolean}){
- const root=useRef<HTMLDivElement>(null),canvas=useRef<HTMLCanvasElement>(null),api=useRef({go:(_d:number)=>{},focus:(_i:number)=>{},wake:()=>{}}),retained=useRef(0),openRef=useRef(onOpen),pausedRef=useRef(false);openRef.current=onOpen;
+ const root=useRef<HTMLDivElement>(null),canvas=useRef<HTMLCanvasElement>(null),api=useRef({go:(_d:number)=>{},focus:(_i:number)=>{},wake:()=>{},syncPause:(_p:boolean)=>{}}),retained=useRef(0),openRef=useRef(onOpen),pausedRef=useRef(false);openRef.current=onOpen;
  const [active,setActive]=useState(0),[paused,setPaused]=useState(false),mode=chapter.mode as Mode;
  pausedRef.current=paused;
- useEffect(()=>{api.current.wake();},[paused]);
+ useEffect(()=>{api.current.syncPause(paused);},[paused]);
  useEffect(()=>{
   const stage=root.current,surface=canvas.current;if(!stage||!surface)return;const context=surface.getContext("2d");if(!context)return;
   const el:HTMLDivElement=stage,c:HTMLCanvasElement=surface,ctx:CanvasRenderingContext2D=context;
-  let dead=false,visible=false,raf=0,last=0,phase=retained.current,w=640,h=419,hold=HOLD_MS,tween=0,from=phase,to=phase,tweenManual=false,drag=false,moved=false,startX=0,base=phase,wheelSum=0,wheelAt=0,loaded=false;
+  let dead=false,visible=false,raf=0,last=0,phase=retained.current,w=640,h=419,holdUntil=performance.now()+HOLD_MS,tween=0,tweenStart=0,pausedAt=0,from=phase,to=phase,tweenManual=false,drag=false,moved=false,startX=0,base=phase,wheelSum=0,wheelAt=0,loaded=false;
   let panels:Panel[]=[];
   const frameInterval=mode==="warp"||mode==="stream"?1000/30:1000/40;
   const images=works.map(()=>{const im=new Image();im.decoding="async";im.onload=()=>wake();return im;});
   const buttons=[...el.querySelectorAll<HTMLButtonElement>(".panel-access")];
   function wake(){if(!raf&&!dead){last=performance.now()-frameInterval;raf=requestAnimationFrame(draw);}}
-  function tweenTo(v:number,manual=true){if(reduced){phase=v;tween=0;hold=HOLD_MS;wake();return;}from=phase;to=v;tween=.000001;tweenManual=manual;hold=HOLD_MS;wake();}
+  function tweenTo(v:number,manual=true){if(reduced){phase=v;tween=0;holdUntil=performance.now()+HOLD_MS;wake();return;}from=phase;to=v;tween=.000001;tweenStart=performance.now();tweenManual=manual;holdUntil=tweenStart+TRANSITION_MS+HOLD_MS;wake();}
   function step(direction:number){const anchor=tween>0?to:Math.round(phase);tweenTo(anchor+direction,true);}
   function focus(i:number){let goal=mode==="orbit"?works.length/4-i:i;const n=works.length;goal+=Math.round((phase-goal)/n)*n;tweenTo(goal,true);}
-  api.current={go:step,focus,wake};
+  function syncPause(next:boolean){const now=performance.now();if(next){pausedAt=now;}else if(pausedAt){if(tween>0&&!tweenManual)tweenStart+=now-pausedAt;if(tween===0)holdUntil=now+HOLD_MS;pausedAt=0;}wake();}
+  api.current={go:step,focus,wake,syncPause};
   function draw(time:number){
    raf=0;if(dead)return;
    if(time-last<frameInterval&&visible&&!document.hidden){raf=requestAnimationFrame(draw);return;}
-   const dt=Math.min(.08,(time-last)/1000||.016);last=time;
+   last=time;
    const keyboardFocus=el.contains(document.activeElement)&&document.activeElement?.matches(":focus-visible"),auto=visible&&!document.hidden&&!pausedRef.current&&!reduced&&!drag&&!keyboardFocus;
    const runningTween=tween>0&&(!pausedRef.current||tweenManual);
-   if(runningTween){tween=Math.min(1,tween+dt*1000/TRANSITION_MS);phase=from+(to-from)*easer(tween);if(tween===1){phase=to;tween=0;tweenManual=false;hold=HOLD_MS;}}
-   else if(auto&&tween===0&&(hold-=dt*1000)<=0)tweenTo(Math.round(phase)+1,false);
+   if(runningTween){tween=Math.min(1,Math.max(.000001,(time-tweenStart)/TRANSITION_MS));phase=from+(to-from)*easer(tween);if(tween===1){phase=to;tween=0;tweenManual=false;holdUntil=time+HOLD_MS;}}
+   else if(auto&&tween===0&&time>=holdUntil)tweenTo(Math.round(phase)+1,false);
    retained.current=phase;el.dataset.phase=phase.toFixed(4);
    ctx.clearRect(0,0,w,h);ctx.fillStyle="#e9e7e7";ctx.fillRect(0,0,w,h);
    const scale=Math.max(w/STAGE_W,h/STAGE_H),ox=(w-STAGE_W*scale)/2,oy=(h-STAGE_H*scale)/2;
@@ -54,9 +55,9 @@ export default function SpatialGallery<T extends GalleryWork>({chapter,works,onO
   }
   function size(){w=el.clientWidth;h=el.clientHeight;const d=Math.min(devicePixelRatio,mode==="warp"||mode==="stream"?1.15:1.35,Math.sqrt(2600000/Math.max(1,w*h)));c!.width=Math.max(1,Math.round(w*d));c!.height=Math.max(1,Math.round(h*d));ctx!.setTransform(d,0,0,d,0,0);wake();}
   const ro=new ResizeObserver(size);ro.observe(el);size();
-  const io=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;if(visible){if(!loaded){loaded=true;images.forEach((im,i)=>im.src=works[i].small);}wake();}else if(raf){cancelAnimationFrame(raf);raf=0;}},{rootMargin:"160px"});io.observe(el);
+  const io=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;if(visible){if(!loaded){loaded=true;holdUntil=performance.now()+HOLD_MS;images.forEach((im,i)=>im.src=works[i].small);}wake();}else if(raf){cancelAnimationFrame(raf);raf=0;}},{rootMargin:"160px"});io.observe(el);
   const down=(e:PointerEvent)=>{if((e.target as Element).closest(".scene-ui"))return;drag=true;tween=0;startX=e.clientX;base=phase;moved=false;el.setPointerCapture(e.pointerId);};
-  const move=(e:PointerEvent)=>{if(!drag)return;const dx=e.clientX-startX;if(Math.abs(dx)>5)moved=true;phase=base+(mode==="strip"?1:-1)*dx/Math.max(90,w/6.5);hold=HOLD_MS;wake();};
+  const move=(e:PointerEvent)=>{if(!drag)return;const dx=e.clientX-startX;if(Math.abs(dx)>5)moved=true;phase=base+(mode==="strip"?1:-1)*dx/Math.max(90,w/6.5);holdUntil=performance.now()+HOLD_MS;wake();};
   const up=(e:PointerEvent)=>{if(!drag)return;drag=false;if(el.hasPointerCapture(e.pointerId))el.releasePointerCapture(e.pointerId);
    if(moved){tweenTo(Math.round(phase),true);return;}
    const r=el.getBoundingClientRect(),scale=Math.max(w/STAGE_W,h/STAGE_H),point={x:(e.clientX-r.left-(w-STAGE_W*scale)/2)/scale,y:(e.clientY-r.top-(h-STAGE_H*scale)/2)/scale};
