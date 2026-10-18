@@ -66,7 +66,16 @@ function drawBow(ctx:CanvasRenderingContext2D,img:HTMLImageElement,b:Box,bow:num
   ctx.drawImage(img,sx+sw*u,sy,sw/steps+.15,sh,x-.12,-b.h/2-dy-2,b.w/steps+.32,b.h+2*dy+4);
  }ctx.restore();
 }
-function drawReel(ctx:CanvasRenderingContext2D,img:HTMLImageElement,left:number,right:number){if(right<0||left>W)return;const {sx,sy,sw,sh}=crop(img,(right-left)/(H*.38)),step=3;for(let x=Math.max(0,left);x<Math.min(W,right);x+=step){const dx=Math.min(step+.7,right-x,W-x),h=reelHeight(x+dx/2),u=(x-left)/(right-left);ctx.drawImage(img,sx+sw*u,sy,sw*dx/(right-left)+.1,sh,x,H/2-h/2,dx+.35,h);} }
+function drawReel(ctx:CanvasRenderingContext2D,img:HTMLImageElement,left:number,right:number){
+ if(right<0||left>W)return;const {sx,sy,sw,sh}=crop(img,(right-left)/(H*.38));
+ // Clip each card to one continuous hourglass contour. Each image column is
+ // extended under the clip so enlarged canvas rendering cannot leave steps.
+ ctx.save();ctx.beginPath();for(let j=0;j<=128;j++){const x=mix(left,right,j/128),h=reelHeight(x),y=H/2-h/2;j?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+ for(let j=128;j>=0;j--){const x=mix(left,right,j/128),h=reelHeight(x);ctx.lineTo(x,H/2+h/2);}ctx.closePath();ctx.clip();
+ const step=2;for(let x=Math.max(0,left);x<Math.min(W,right);x+=step){const dx=Math.min(step+.35,right-x,W-x),h=reelHeight(x+dx/2),u=(x-left)/(right-left);
+  ctx.drawImage(img,sx+sw*u,sy,sw*dx/(right-left)+.15,sh,x-.12,H/2-h/2-3,dx+.25,h+6);
+ }ctx.restore();
+}
 function flarePath(ctx:CanvasRenderingContext2D,neck:number,outer:number,strength:number){ctx.beginPath();for(let j=0;j<=32;j++){const s=j/32,x=mix(neck,outer,s),h=flareHeight(s,strength);j?ctx.lineTo(x,CY-h/2):ctx.moveTo(x,CY-h/2);}for(let j=32;j>=0;j--){const s=j/32,x=mix(neck,outer,s),h=flareHeight(s,strength);ctx.lineTo(x,CY+h/2);}ctx.closePath();}
 function drawFlare(ctx:CanvasRenderingContext2D,img:HTMLImageElement,neck:number,outer:number,strength:number){if(Math.abs(outer-neck)<.8)return;const left=outer<neck,{sx,sy,sw,sh}=crop(img,1.1),n=72;
  const tex=(s:number)=>.5+(left?-1:1)*.28*(1-Math.exp(-8*s));
