@@ -14,12 +14,12 @@ export default function SpatialGallery<T extends GalleryWork>({chapter,works,onO
  useEffect(()=>{
   const stage=root.current,surface=canvas.current;if(!stage||!surface)return;const context=surface.getContext("2d");if(!context)return;
   const el:HTMLDivElement=stage,c:HTMLCanvasElement=surface,ctx:CanvasRenderingContext2D=context;
-  let dead=false,visible=false,raf=0,last=0,phase=retained.current,w=640,h=419,holdUntil=performance.now()+HOLD_MS,tween=0,tweenStart=0,pausedAt=0,from=phase,to=phase,tweenManual=false,drag=false,moved=false,startX=0,base=phase,wheelSum=0,wheelAt=0,loaded=false;
+  let dead=false,visible=false,allocated=false,raf=0,last=0,phase=retained.current,w=640,h=419,holdUntil=performance.now()+HOLD_MS,tween=0,tweenStart=0,pausedAt=0,from=phase,to=phase,tweenManual=false,drag=false,moved=false,startX=0,base=phase,wheelSum=0,wheelAt=0,loaded=false;
   let panels:Panel[]=[];
   const frameInterval=mode==="warp"||mode==="stream"?1000/30:1000/40;
   const images=works.map(()=>{const im=new Image();im.decoding="async";im.onload=()=>wake();return im;});
   const buttons=[...el.querySelectorAll<HTMLButtonElement>(".panel-access")];
-  function wake(){if(!raf&&!dead){last=performance.now()-frameInterval;raf=requestAnimationFrame(draw);}}
+  function wake(){if(visible&&!raf&&!dead){last=performance.now()-frameInterval;raf=requestAnimationFrame(draw);}}
   function tweenTo(v:number,manual=true){if(reduced){phase=v;tween=0;holdUntil=performance.now()+HOLD_MS;wake();return;}from=phase;to=v;tween=.000001;tweenStart=performance.now();tweenManual=manual;holdUntil=tweenStart+TRANSITION_MS+HOLD_MS;wake();}
   function step(direction:number){const anchor=tween>0&&tweenManual?to:Math.round(phase);tweenTo(anchor+direction,true);}
   function focus(i:number){let goal=mode==="orbit"?works.length/4-i:i;const n=works.length;goal+=Math.round((phase-goal)/n)*n;tweenTo(goal,true);}
@@ -53,9 +53,9 @@ export default function SpatialGallery<T extends GalleryWork>({chapter,works,onO
    if(central)setActive(v=>v===central!.i?v:central!.i);
    if(visible&&!document.hidden&&(runningTween||auto||drag))raf=requestAnimationFrame(draw);
   }
-  function size(){w=el.clientWidth;h=el.clientHeight;const d=Math.min(devicePixelRatio,mode==="warp"||mode==="stream"?1.15:1.35,Math.sqrt(2600000/Math.max(1,w*h)));c!.width=Math.max(1,Math.round(w*d));c!.height=Math.max(1,Math.round(h*d));ctx!.setTransform(d,0,0,d,0,0);wake();}
+  function size(){w=el.clientWidth;h=el.clientHeight;if(!visible)return;const d=Math.min(devicePixelRatio,mode==="warp"||mode==="stream"?1.15:1.35,Math.sqrt(2600000/Math.max(1,w*h))),cw=Math.max(1,Math.round(w*d)),ch=Math.max(1,Math.round(h*d));if(!allocated||c.width!==cw||c.height!==ch){c.width=cw;c.height=ch;ctx.setTransform(d,0,0,d,0,0);allocated=true;}wake();}
   const ro=new ResizeObserver(size);ro.observe(el);size();
-  const io=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;if(visible){if(!loaded){loaded=true;holdUntil=performance.now()+HOLD_MS;images.forEach((im,i)=>im.src=works[i].small);}wake();}else if(raf){cancelAnimationFrame(raf);raf=0;}},{rootMargin:"160px"});io.observe(el);
+  const io=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;if(visible){size();if(!loaded){loaded=true;holdUntil=performance.now()+HOLD_MS;images.forEach((im,i)=>im.src=works[i].small);}wake();}else{if(raf){cancelAnimationFrame(raf);raf=0;}if(allocated){c.width=c.height=1;allocated=false;}}},{rootMargin:"160px"});io.observe(el);
   const down=(e:PointerEvent)=>{if((e.target as Element).closest(".scene-ui"))return;drag=true;tween=0;startX=e.clientX;base=phase;moved=false;el.setPointerCapture(e.pointerId);};
   const move=(e:PointerEvent)=>{if(!drag)return;const dx=e.clientX-startX;if(Math.abs(dx)>5)moved=true;phase=base+(mode==="strip"?1:-1)*dx/Math.max(90,w/6.5);holdUntil=performance.now()+HOLD_MS;wake();};
   const up=(e:PointerEvent)=>{if(!drag)return;drag=false;if(el.hasPointerCapture(e.pointerId))el.releasePointerCapture(e.pointerId);
