@@ -21,7 +21,7 @@ export default function SpatialGallery<T extends GalleryWork>({chapter,works,onO
   const buttons=[...el.querySelectorAll<HTMLButtonElement>(".panel-access")];
   function wake(){if(!raf&&!dead){last=performance.now()-frameInterval;raf=requestAnimationFrame(draw);}}
   function tweenTo(v:number,manual=true){if(reduced){phase=v;tween=0;holdUntil=performance.now()+HOLD_MS;wake();return;}from=phase;to=v;tween=.000001;tweenStart=performance.now();tweenManual=manual;holdUntil=tweenStart+TRANSITION_MS+HOLD_MS;wake();}
-  function step(direction:number){const anchor=tween>0?to:Math.round(phase);tweenTo(anchor+direction,true);}
+  function step(direction:number){const anchor=tween>0&&tweenManual?to:Math.round(phase);tweenTo(anchor+direction,true);}
   function focus(i:number){let goal=mode==="orbit"?works.length/4-i:i;const n=works.length;goal+=Math.round((phase-goal)/n)*n;tweenTo(goal,true);}
   function syncPause(next:boolean){const now=performance.now();if(next){pausedAt=now;}else if(pausedAt){if(tween>0&&!tweenManual)tweenStart+=now-pausedAt;if(tween===0)holdUntil=now+HOLD_MS;pausedAt=0;}wake();}
   api.current={go:step,focus,wake,syncPause};
